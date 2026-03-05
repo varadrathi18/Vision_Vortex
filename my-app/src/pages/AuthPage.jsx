@@ -123,7 +123,7 @@ const AuthPage = ({ initialMode = 'login', onLoginSuccess }) => {
                         {mode === 'login' ? 'Access the Vault' : mode === 'signup' ? 'Join Vampire Vault' : 'Verify Identity'}
                     </h2>
                     <p className="text-sm text-slate-400">
-                        {mode === 'login' ? 'Secure read-only environment' : mode === 'signup' ? 'Stop the silent drain today' : `Enter the OTP sent to your console`}
+                        {mode === 'login' ? 'Secure read-only environment' : mode === 'signup' ? 'Stop the silent drain today' : `Enter the OTP sent to your email`}
                     </p>
                 </div>
 
@@ -301,8 +301,7 @@ const AuthPage = ({ initialMode = 'login', onLoginSuccess }) => {
                 {mode === 'otp' && (
                     <form onSubmit={handleOtpSubmit} className="space-y-6">
                         <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 text-center">
-                            <p className="text-sm text-slate-300 mb-2">We've generated an OTP for <span className="text-white font-bold">{formData.email}</span>.</p>
-                            <p className="text-xs text-red-400 font-semibold border border-red-900/50 bg-red-500/10 p-2 rounded">(Check the backend terminal console for the OTP code)</p>
+                            <p className="text-sm text-slate-300 mb-2">We've sent a verification OTP to <span className="text-white font-bold">{formData.email}</span>.</p>
                         </div>
 
                         <div>

@@ -23,7 +23,7 @@ const formatCurrency = (amount, currency) => {
     }).format(amount);
 };
 
-const SubscriptionManager = () => {
+const SubscriptionManager = ({ onNavigate }) => {
     const [subscriptions, setSubscriptions] = useState([]);
     const [displayCurrency, setDisplayCurrency] = useState('USD ($)');
 
@@ -201,6 +201,12 @@ const SubscriptionManager = () => {
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold text-white tracking-tight">Subscription Manager</h1>
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => onNavigate('statementUpload')}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500 text-blue-400 rounded hover:bg-blue-600 hover:text-white transition-colors text-sm font-semibold"
+                        >
+                            <Shield size={16} /> Scan Statement
+                        </button>
                         <button className="flex items-center gap-2 px-4 py-2 border border-[#20c997] text-[#20c997] rounded hover:bg-[#20c997]/10 transition-colors text-sm font-semibold">
                             <Settings size={16} /> Settings
                         </button>

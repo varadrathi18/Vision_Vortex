@@ -3,6 +3,7 @@ import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 
 import SubscriptionManager from './pages/SubscriptionManager';
+import StatementUpload from './pages/StatementUpload';
 
 function App() {
   const [currentRoute, setCurrentRoute] = useState('landing'); // 'landing', 'login', 'signup', 'dashboard'
@@ -28,7 +29,8 @@ function App() {
       {currentRoute === 'landing' && <LandingPage onNavigate={navigate} />}
       {currentRoute === 'login' && <AuthPage initialMode="login" onLoginSuccess={handleLoginSuccess} />}
       {currentRoute === 'signup' && <AuthPage initialMode="signup" onLoginSuccess={handleLoginSuccess} />}
-      {currentRoute === 'dashboard' && <SubscriptionManager />}
+      {currentRoute === 'dashboard' && <SubscriptionManager onNavigate={navigate} />}
+      {currentRoute === 'statementUpload' && <StatementUpload onNavigate={navigate} />}
     </div>
   );
 }
