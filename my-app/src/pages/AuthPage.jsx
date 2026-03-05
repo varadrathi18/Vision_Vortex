@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Mail, Lock, User, Phone, Calendar, ArrowRight, CheckCircle } from 'lucide-react';
 
-const AuthPage = ({ initialMode = 'login', onLoginSuccess }) => {
+const AuthPage = ({ initialMode = 'login', onLoginSuccess, onSignupSuccess }) => {
     const [mode, setMode] = useState(initialMode); // 'login', 'signup', 'otp'
     const [formData, setFormData] = useState({
         name: '', email: '', dob: '', password: '', confirmPassword: '', mobile: '', otp: ''
@@ -65,9 +65,17 @@ const AuthPage = ({ initialMode = 'login', onLoginSuccess }) => {
 
             if (!res.ok) throw new Error(data.error);
 
-            // Successfully verified, go to login
-            setMode('login');
-            alert('Verification successful! Please log in.');
+            // Successfully verified, go to signup success destination
+            alert('Verification successful!');
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+                if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+            }
+            if (onSignupSuccess) {
+                onSignupSuccess();
+            } else {
+                setMode('login');
+            }
         } catch (err) {
             setError(err.message);
         } finally {
