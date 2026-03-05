@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { Icon } from '@iconify-icon/react';
 
 const API_URL = 'http://127.0.0.1:5000/api/subscriptions';
+const NOTIFICATIONS_API_URL = 'http://127.0.0.1:5000/api/notifications';
 
 // Mock Exchange Rates to USD base for multi-currency support
 const exchangeRatesToUSD = {
@@ -25,6 +26,7 @@ const formatCurrency = (amount, currency) => {
 
 const SubscriptionManager = () => {
     const [subscriptions, setSubscriptions] = useState([]);
+    const [notifications, setNotifications] = useState([]);
     const [displayCurrency, setDisplayCurrency] = useState('USD ($)');
 
     // UI State
@@ -51,7 +53,49 @@ const SubscriptionManager = () => {
     // Fetch subscriptions on mount
     useEffect(() => {
         fetchSubscriptions();
+        fetchNotifications();
     }, []);
+
+    const fetchNotifications = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const res = await fetch(NOTIFICATIONS_API_URL, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setNotifications(data);
+            }
+        } catch (error) {
+            console.error("Fetch notifications error:", error);
+        }
+    };
+
+    const handleNotificationAction = async (notificationId, action) => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${NOTIFICATIONS_API_URL}/${notificationId}/action`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action })
+            });
+
+            if (res.ok) {
+                // If the user cancelled, we need to refresh subscriptions too
+                if (action === 'cancel') {
+                    fetchSubscriptions();
+                }
+                // Refresh Notifications state to hide the banner
+                fetchNotifications();
+            }
+        } catch (error) {
+            console.error("Action error:", error);
+        }
+    };
 
     const fetchSubscriptions = async () => {
         const token = localStorage.getItem('token');
@@ -212,6 +256,42 @@ const SubscriptionManager = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Notifications Banner */}
+                {notifications.length > 0 && (
+                    <div className="mb-8 space-y-3">
+                        {notifications.map(notif => (
+                            <motion.div
+                                key={notif._id}
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center justify-between"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <Bell className="text-yellow-500" size={24} />
+                                    <div>
+                                        <h4 className="text-yellow-500 font-bold hover:text-yellow-400">{notif.message}</h4>
+                                        <p className="text-xs text-yellow-500/70">Please decide on your {notif.subscriptionId?.subscriptionName} subscription.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleNotificationAction(notif._id, 'continue')}
+                                        className="bg-[#20c997] hover:bg-[#1db789] text-black text-sm font-bold px-4 py-2 rounded transition-colors"
+                                    >
+                                        Continue
+                                    </button>
+                                    <button
+                                        onClick={() => handleNotificationAction(notif._id, 'cancel')}
+                                        className="bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 text-sm font-bold px-4 py-2 rounded transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Calendar Grid Integration */}
                 <CalendarGrid

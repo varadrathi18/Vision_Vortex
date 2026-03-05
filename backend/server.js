@@ -4,6 +4,8 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import notificationRoutes from './routes/notifications.js';
+import { startCronJobs } from './cron/notifySubscriptions.js';
 
 dotenv.config();
 
@@ -17,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
   res.send('Vampire Vault API is running');
@@ -28,6 +31,7 @@ mongoose.connect(MONGO_URI)
     console.log('✅ Connected to MongoDB');
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
+      startCronJobs(); // Initialize scheduled tasks
     });
   })
   .catch((err) => {

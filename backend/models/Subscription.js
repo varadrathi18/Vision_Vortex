@@ -15,4 +15,6 @@ const subscriptionSchema = new mongoose.Schema({
     color: { type: String, default: '#20c997' }
 }, { timestamps: true });
 
-export const Subscription = mongoose.model('Subscription', subscriptionSchema);
+const Subscription = mongoose.model('Subscription', subscriptionSchema);
+
+export default Subscription;
