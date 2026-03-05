@@ -10,13 +10,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_vampire_vault_key_202
 // Nodemailer Transporter Configuration
 // Note: We use ethereal for testing if no real credentials are provided, 
 // but we'll set it up to accept a real Gmail/App password via ENV vars.
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+let transporter = null;
+const getTransporter = () => {
+    if (!transporter) {
+        transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
     }
-});
+    return transporter;
+};
 
 // Helper function to send email
 const sendOTPEmail = async (email, otp) => {
@@ -42,7 +48,8 @@ const sendOTPEmail = async (email, otp) => {
         };
 
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            await transporter.sendMail(mailOptions);
+            const mailTransporter = getTransporter();
+            await mailTransporter.sendMail(mailOptions);
             console.log(`Email sent to ${email}`);
         } else {
             console.log(`\n============================`);
