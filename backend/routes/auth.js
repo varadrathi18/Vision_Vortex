@@ -135,7 +135,17 @@ router.post('/verify-otp', async (req, res) => {
             user.otpExpiry = null;
             await user.save();
 
-            return res.status(200).json({ message: 'OTP verified successfully. You can now login.' });
+            // Generate JWT so user is immediately logged in after OTP verification
+            const payload = {
+                user: { id: user._id }
+            };
+            const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+
+            return res.status(200).json({
+                message: 'OTP verified successfully.',
+                token,
+                user: { name: user.name, email: user.email }
+            });
         } else {
             return res.status(400).json({ error: 'Invalid OTP' });
         }
