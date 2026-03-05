@@ -15,11 +15,32 @@ const OnboardingQuestionnaire = ({ onNavigate }) => {
         setStep(2);
     };
 
-    const handleNext = () => {
-        if (step === 2) setStep(3);
-        else if (step === 3) {
-            // Finish onboarding and go to dashboard
-            onNavigate('dashboard');
+    const handleNext = async () => {
+        if (step === 2) {
+            setStep(3);
+        } else if (step === 3) {
+            // Save to backend
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    await fetch('http://127.0.0.1:5000/api/auth/profile', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            userType: formData.userType,
+                            financialAmount: Number(formData.financialAmount),
+                            bankName: formData.bankName
+                        })
+                    });
+                } catch (error) {
+                    console.error("Failed to save onboarding data:", error);
+                }
+            }
+            // Finish onboarding and go to statement upload
+            onNavigate('statement-upload');
         }
     };
 

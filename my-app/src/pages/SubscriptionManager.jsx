@@ -25,7 +25,12 @@ const formatCurrency = (amount, currency) => {
 
 const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
     const [subscriptions, setSubscriptions] = useState([]);
-    const [displayCurrency, setDisplayCurrency] = useState('USD ($)');
+    const [displayCurrency, setDisplayCurrency] = useState(localStorage.getItem('preferredCurrency') || 'USD ($)');
+
+    // Save currency preference when changed
+    useEffect(() => {
+        localStorage.setItem('preferredCurrency', displayCurrency);
+    }, [displayCurrency]);
 
     // UI State
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -199,40 +204,7 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
     return (
         <div className={`min-h-screen ${isDarkMode ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'} font-sans transition-colors duration-300`}>
 
-            {/* Top Navbar for returning users */}
-            {!isNewSignup && (
-                <header className={`flex justify-between items-center px-8 py-4 border-b ${isDarkMode ? 'border-slate-800 bg-[#020617]' : 'border-slate-200 bg-white'} mb-8 shadow-sm`}>
-                    <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 ${isDarkMode ? 'bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'bg-slate-900'} rounded-lg flex items-center justify-center text-white font-black text-xl`}>
-                            V
-                        </div>
-                        <h1 className="text-xl font-bold tracking-tight">Vampire <span className={isDarkMode ? 'text-red-500' : 'text-slate-500'}>Vault</span></h1>
-                    </div>
-
-                    <nav className="hidden md:flex items-center gap-2">
-                        <button onClick={() => onNavigate('dashboard')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                            <Home size={16} /> Dashboard
-                        </button>
-                        <button onClick={() => onNavigate('intelligence')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                            <Activity size={16} /> Intelligence
-                        </button>
-                        <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-900 text-white'}`}>
-                            <CreditCard size={16} /> Subscriptions
-                        </button>
-                        <button onClick={() => onNavigate('reports')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                            <BarChart2 size={16} /> Reports
-                        </button>
-
-                        <div className={`w-px h-5 mx-2 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-300'}`}></div>
-
-                        <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`} title="Toggle Dark Mode">
-                            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                        </button>
-                    </nav>
-                </header>
-            )}
-
-            <div className={`max-w-5xl mx-auto ${isNewSignup ? 'p-8' : 'px-8 pb-8'}`}>
+            <div className={`max-w-5xl mx-auto ${isNewSignup ? 'p-8' : 'px-8 pb-8'} pt-8`}>
                 {/* Header */}
                 <div className="flex justify-between items-center mb-8">
                     <h1 className={`text-3xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>

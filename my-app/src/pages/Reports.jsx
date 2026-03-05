@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
     LineChart,
     Line,
@@ -24,39 +24,6 @@ import {
     Moon
 } from "lucide-react";
 
-/* ---------- Rupee Formatter ---------- */
-const formatINR = (value) =>
-    new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        minimumFractionDigits: 2,
-    }).format(value);
-
-/* ---------- Data ---------- */
-const trendData = [
-    { month: "Aug", amount: 120 },
-    { month: "Sep", amount: 130 },
-    { month: "Oct", amount: 180 },
-    { month: "Nov", amount: 150 },
-    { month: "Dec", amount: 920 },
-    { month: "Jan", amount: 170 },
-    { month: "Feb", amount: 220 },
-    { month: "Mar", amount: 210 },
-    { month: "Apr", amount: 950 },
-    { month: "May", amount: 230 },
-    { month: "Jun", amount: 240 },
-    { month: "Jul", amount: 57 },
-];
-
-const categoryData = [
-    { name: "Music", value: 43500 },
-    { name: "Productivity", value: 21500 },
-    { name: "Software", value: 19800 },
-    { name: "Video", value: 9500 },
-    { name: "VPS", value: 4600 },
-    { name: "Domain", value: 1100 },
-];
-
 const COLORS = [
     "#3b82f6",
     "#22c55e",
@@ -66,110 +33,164 @@ const COLORS = [
     "#6366f1",
 ];
 
-/* ---------- Card Component ---------- */
-const Card = ({ title, total, avg, payments }) => (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full">
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-            <Calendar size={16} />
-            {title}
-        </div>
-
-        <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between">
-                <div className="flex gap-2 text-gray-400">
-                    <DollarSign size={16} />
-                    Total
-                </div>
-                <span className="font-semibold text-white">
-                    {formatINR(total)}
-                </span>
-            </div>
-
-            <div className="flex justify-between">
-                <div className="flex gap-2 text-gray-400">
-                    <TrendingUp size={16} />
-                    Daily Avg
-                </div>
-                <span className="text-white">
-                    {formatINR(avg)}
-                </span>
-            </div>
-
-            <div className="flex justify-between">
-                <div className="flex gap-2 text-gray-400">
-                    <CreditCard size={16} />
-                    Payments
-                </div>
-                <span className="text-white">{payments}</span>
-            </div>
-        </div>
-
-        <button className="mt-4 w-full py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm">
-            View Details →
-        </button>
-    </div>
-);
-
 /* ---------- Main Component ---------- */
 export default function Reports({ onNavigate }) {
-    const [isDarkMode, setIsDarkMode] = React.useState(true);
+    const [isDarkMode, setIsDarkMode] = useState(true);
+    const [subscriptions, setSubscriptions] = useState([]);
+
+    // Currency Setup
+    const preferredCurrency = localStorage.getItem('preferredCurrency') || 'USD ($)';
+    const exchangeRatesToUSD = {
+        'USD ($)': 1, 'EUR (€)': 1.08, 'INR (₹)': 0.012, 'GBP (£)': 1.26
+    };
+    const formatCurrency = (value) => new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: preferredCurrency.substring(0, 3),
+        minimumFractionDigits: 0,
+    }).format(value);
+
+    useEffect(() => {
+        const fetchSubscriptions = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/subscriptions', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok) setSubscriptions(data);
+            } catch (error) {
+                console.error("Fetch DB error:", error);
+            }
+        };
+        fetchSubscriptions();
+    }, []);
+
+    // --- Dynamic Calculations ---
+    const getMonthlyEquivalentInUSD = (sub) => {
+        const amt = parseFloat(sub.amount);
+        const val = parseInt(sub.recurrenceInterval) || 1;
+        const rateToUSD = exchangeRatesToUSD[sub.currency || 'USD ($)'] || 1;
+        let monthlyOrig = amt;
+        if (sub.recurrenceType === 'months') monthlyOrig = amt / val;
+        if (sub.recurrenceType === 'weeks') monthlyOrig = (amt / val) * 4.3333;
+        if (sub.recurrenceType === 'years') monthlyOrig = amt / (val * 12);
+        if (sub.recurrenceType === 'days') monthlyOrig = (amt / val) * 30.416;
+        return monthlyOrig * rateToUSD;
+    };
+
+    const displayRateFromUSD = 1 / (exchangeRatesToUSD[preferredCurrency] || 1);
+
+    // Categories
+    const categoryBreakdown = {};
+    subscriptions.forEach(sub => {
+        let cat = 'Other';
+        if (sub.icon === 'netflix' || sub.icon === 'spotify') cat = 'Media/Entertainment';
+        else if (sub.icon === 'briefcase' || sub.icon === 'code') cat = 'Productivity';
+        else if (sub.icon === 'database' || sub.icon === 'cloud') cat = 'Software/VPS';
+
+        const monthlyTargetCost = getMonthlyEquivalentInUSD(sub) * displayRateFromUSD;
+        if (!categoryBreakdown[cat]) categoryBreakdown[cat] = 0;
+        categoryBreakdown[cat] += monthlyTargetCost;
+    });
+
+    const categoryData = Object.keys(categoryBreakdown).map(k => ({
+        name: k,
+        value: categoryBreakdown[k],
+    })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+
+    // Projected Trend Data (Next 6 Months based on monthly equivalent)
+    const trendData = [];
+    let currentMonthlyCost = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalentInUSD(sub), 0) * displayRateFromUSD;
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const d = new Date();
+    for (let i = 0; i < 6; i++) {
+        let monthIndex = (d.getMonth() + i) % 12;
+        trendData.push({
+            month: monthNames[monthIndex],
+            amount: currentMonthlyCost // Simplification: assuming flat recurrent spending 
+        });
+    }
+
+    // Recent Months Cards data
+    const monthCards = [];
+    for (let i = 0; i < 4; i++) {
+        let pastDate = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        monthCards.push({
+            title: `${monthNames[pastDate.getMonth()]} ${pastDate.getFullYear()}`,
+            total: currentMonthlyCost,
+            avg: currentMonthlyCost / 30, // Rough daily avg
+            payments: subscriptions.length
+        });
+    }
+    monthCards.reverse();
+
+    /* ---------- Card Component ---------- */
+    const Card = ({ title, total, avg, payments }) => (
+        <div className={`border rounded-xl p-5 w-full ${isDarkMode ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                <Calendar size={16} />
+                {title}
+            </div>
+
+            <div className={`mt-4 space-y-3 text-sm flex gap-4 justify-between font-medium`}>
+                <div>
+                    <div className={`flex gap-2 text-xs mb-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        <DollarSign size={14} /> Total
+                    </div>
+                    <span className={`font-bold text-lg ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {formatCurrency(total)}
+                    </span>
+                </div>
+
+                <div>
+                    <div className={`flex gap-2 text-xs mb-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        <TrendingUp size={14} /> Daily
+                    </div>
+                    <span className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>
+                        {formatCurrency(avg)}
+                    </span>
+                </div>
+
+                <div>
+                    <div className={`flex gap-2 text-xs mb-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        <CreditCard size={14} /> Active
+                    </div>
+                    <span className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>{payments}</span>
+                </div>
+            </div>
+
+            <button className={`mt-4 w-full py-2 rounded-lg text-sm transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+                View Details →
+            </button>
+        </div>
+    );
 
     return (
         <div className={`min-h-screen ${isDarkMode ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'} font-sans transition-colors duration-300`}>
 
-            {/* Top Navbar */}
-            <header className={`flex justify-between items-center px-8 py-4 border-b ${isDarkMode ? 'border-slate-800 bg-[#020617]' : 'border-slate-200 bg-white'} mb-8 shadow-sm`}>
-                <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 ${isDarkMode ? 'bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'bg-slate-900'} rounded-lg flex items-center justify-center text-white font-black text-xl`}>
-                        V
-                    </div>
-                    <h1 className="text-xl font-bold tracking-tight">Vampire <span className={isDarkMode ? 'text-red-500' : 'text-slate-500'}>Vault</span></h1>
-                </div>
-
-                <nav className="hidden md:flex items-center gap-2">
-                    <button onClick={() => onNavigate('dashboard')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                        <Home size={16} /> Dashboard
-                    </button>
-                    <button onClick={() => onNavigate('intelligence')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                        <Activity size={16} /> Intelligence
-                    </button>
-                    <button onClick={() => onNavigate('subscriptions')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                        <CreditCard size={16} /> Subscriptions
-                    </button>
-                    <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-900 text-white'}`}>
-                        <BarChart2 size={16} /> Reports
-                    </button>
-
-                    <div className={`w-px h-5 mx-2 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-300'}`}></div>
-
-                    <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`} title="Toggle Dark Mode">
-                        {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                    </button>
-                </nav>
-            </header>
-
-            <div className="max-w-5xl mx-auto px-8 pb-8">
+            <div className={`mt-8 max-w-5xl mx-auto px-8 pb-8`}>
                 <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Expense Reports</h1>
                 <p className="text-gray-400 mb-8">
                     Comprehensive analysis of your subscription expenses
                 </p>
 
                 {/* Monthly */}
-                <h2 className={`text-lg font-semibold mb-4 border-b pb-2 ${isDarkMode ? 'border-zinc-800 text-white' : 'border-zinc-200 text-slate-800'}`}>Monthly Expenses</h2>
+                <h2 className={`text-lg font-semibold mb-4 border-b pb-2 ${isDarkMode ? 'border-zinc-800 text-white' : 'border-zinc-200 text-slate-800'}`}>Monthly Overview</h2>
                 <div className="grid md:grid-cols-4 gap-6 mb-10">
-                    <Card title="April 2025" total={944.83} avg={31.49} payments={4} />
-                    <Card title="May 2025" total={228.5} avg={7.37} payments={3} />
-                    <Card title="June 2025" total={228.5} avg={7.62} payments={3} />
-                    <Card title="July 2025" total={57.23} avg={1.85} payments={1} />
+                    {monthCards.map((mc, idx) => (
+                        <Card key={idx} title={mc.title} total={mc.total} avg={mc.avg} payments={mc.payments} />
+                    ))}
                 </div>
 
                 {/* Charts Section */}
                 <div className="grid lg:grid-cols-2 gap-8 mt-12">
                     {/* Line Chart */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                        <h3 className="text-lg font-semibold mb-2 text-white">Expense Trends</h3>
-                        <p className="text-gray-400 text-sm mb-4">
-                            Monthly spending over time (Last 12 months)
+                    <div className={`border rounded-xl p-6 ${isDarkMode ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                        <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Projected Expense Trend</h3>
+                        <p className={`text-sm mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Projected monthly spending over the next 6 months
                         </p>
 
                         <ResponsiveContainer width="100%" height={300}>
@@ -177,10 +198,10 @@ export default function Reports({ onNavigate }) {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                                 <XAxis dataKey="month" stroke="#9ca3af" />
                                 <YAxis
-                                    stroke="#9ca3af"
-                                    tickFormatter={(value) => formatINR(value)}
+                                    stroke={isDarkMode ? "#64748b" : "#94a3b8"}
+                                    tickFormatter={(value) => formatCurrency(value)}
                                 />
-                                <Tooltip formatter={(value) => formatINR(value)} />
+                                <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: isDarkMode ? '#1e293b' : '#fff', borderColor: isDarkMode ? '#334155' : '#cbd5e1', color: isDarkMode ? '#f8fafc' : '#0f172a' }} />
                                 <Line
                                     type="monotone"
                                     dataKey="amount"
@@ -192,23 +213,23 @@ export default function Reports({ onNavigate }) {
                     </div>
 
                     {/* Pie Chart */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                        <h3 className="text-lg font-semibold mb-2 text-white">
+                    <div className={`border rounded-xl p-6 ${isDarkMode ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                        <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                             Spending by Category
                         </h3>
-                        <p className="text-gray-400 text-sm mb-4">
-                            Breakdown of expenses by category (Last 12 months)
+                        <p className={`text-sm mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Distribution of active subscriptions
                         </p>
 
                         <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
                                 <Pie
-                                    data={categoryData}
+                                    data={categoryData.length > 0 ? categoryData : [{ name: "No Subscriptions", value: 1 }]}
                                     dataKey="value"
                                     nameKey="name"
-                                    outerRadius={110}
+                                    outerRadius={100}
                                     label={(entry) =>
-                                        `${entry.name}: ${formatINR(entry.value)}`
+                                        categoryData.length ? `${entry.name}: ${formatCurrency(entry.value)}` : "No Subscriptions"
                                     }
                                 >
                                     {categoryData.map((entry, index) => (
@@ -218,7 +239,7 @@ export default function Reports({ onNavigate }) {
                                         />
                                     ))}
                                 </Pie>
-                                <Tooltip formatter={(value) => formatINR(value)} />
+                                <Tooltip formatter={(value) => categoryData.length ? formatCurrency(value) : ""} contentStyle={{ backgroundColor: isDarkMode ? '#1e293b' : '#fff', borderColor: isDarkMode ? '#334155' : '#cbd5e1', color: isDarkMode ? '#f8fafc' : '#0f172a' }} />
                                 <Legend />
                             </PieChart>
                         </ResponsiveContainer>

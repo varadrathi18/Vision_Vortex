@@ -207,4 +207,38 @@ router.post('/login', async (req, res) => {
     }
 });
 
+import { verifyToken } from '../middleware/auth.js';
+
+// Route 4: Get Profile
+router.get('/profile', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password -otp -otpExpiry');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json(user);
+    } catch (error) {
+        console.error("Profile fetch error:", error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Route 5: Update Profile (Onboarding)
+router.put('/profile', verifyToken, async (req, res) => {
+    try {
+        const { userType, financialAmount, bankName } = req.body;
+
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (userType) user.userType = userType;
+        if (financialAmount) user.financialAmount = financialAmount;
+        if (bankName) user.bankName = bankName;
+
+        await user.save();
+        res.json({ message: 'Profile updated successfully', user: { name: user.name, email: user.email, userType: user.userType } });
+    } catch (error) {
+        console.error("Profile update error:", error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 export default router;
