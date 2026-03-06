@@ -3,6 +3,7 @@ import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from "chart.js";
 import { Ghost, ShieldAlert, TrendingDown, Zap, Home, CreditCard, BarChart2, Settings, Moon, Sun, Activity, Info } from 'lucide-react';
 import { Icon } from '@iconify-icon/react';
+import Papa from 'papaparse';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -10,6 +11,8 @@ const VampireIntelligencePage = ({ onNavigate }) => {
     const [isDarkMode, setIsDarkMode] = useState(true);
     const [subscriptions, setSubscriptions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [csvFile, setCsvFile] = useState(null);
+    const [isScanning, setIsScanning] = useState(false);
 
     // Fetch user subscriptions for Utility Scoring
     useEffect(() => {
@@ -30,6 +33,142 @@ const VampireIntelligencePage = ({ onNavigate }) => {
         };
         fetchSubscriptions();
     }, []);
+
+    // CSV Parse Options
+    const handleFileChange = (e) => {
+        if (e.target.files.length > 0) {
+            setCsvFile(e.target.files[0]);
+        }
+    };
+
+    const handleScan = () => {
+        if (!csvFile) return;
+        setIsScanning(true);
+
+        Papa.parse(csvFile, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                detectGhostsFromCSV(results.data);
+            },
+            error: (error) => {
+                console.error("CSV Parse Error:", error);
+                setIsScanning(false);
+            }
+        });
+    };
+
+    const detectGhostsFromCSV = (data) => {
+        if (data.length === 0) {
+            setIsScanning(false);
+            return;
+        }
+
+        const headers = Object.keys(data[0]);
+        const dateCol = headers.find(h => h.toLowerCase().includes('date')) || headers[0];
+        const descCol = headers.find(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('narration') || h.toLowerCase().includes('merchant') || h.toLowerCase().includes('particulars')) || headers[1];
+        const amountCol = headers.find(h => h.toLowerCase().includes('amount') || h.toLowerCase().includes('debit') || h.toLowerCase().includes('withdrawal')) || headers[2];
+
+        const merchantGroups = {};
+
+        data.forEach(row => {
+            const rawDesc = String(row[descCol] || '');
+            const amountStr = String(row[amountCol] || '0');
+            const dateStr = String(row[dateCol] || '');
+
+            if (!rawDesc || !amountStr || !dateStr) return;
+
+            // Clean description (remove numbers, asterisks, trim)
+            const cleanDesc = rawDesc.replace(/[0-9*#\-\/]/g, '').trim().toUpperCase();
+            if (!cleanDesc || cleanDesc.length < 3) return;
+
+            // Extract amount ignoring negative signs usually used in debits
+            const rawAmount = parseFloat(amountStr.replace(/,/g, ""));
+            // Depending on the bank format, debit might be positive or negative or in a specific column. We'll take Math.abs
+            const amount = Math.abs(rawAmount);
+            if (isNaN(amount) || amount === 0) return;
+
+            // Handle date parsing safely
+            const dateParts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
+            let date;
+            if (dateParts.length === 3) {
+                // simple heuristic for DD/MM/YYYY vs MM/DD/YYYY - assume DD/MM/YYYY or YYYY-MM-DD
+                if (dateParts[0].length === 4) {
+                    date = new Date(dateStr); // YYYY-MM-DD
+                } else {
+                    // Try DD-MM-YYYY
+                    date = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+                    if (isNaN(date.getTime())) date = new Date(dateStr); // fallback
+                }
+            } else {
+                date = new Date(dateStr);
+            }
+
+            if (isNaN(date.getTime())) return;
+
+            if (!merchantGroups[cleanDesc]) merchantGroups[cleanDesc] = [];
+            merchantGroups[cleanDesc].push({ date: date.getTime(), amount, originalDesc: rawDesc, cleanDesc });
+        });
+
+        const newGhosts = [];
+        const existingSubNames = subscriptions.map(s => (s.subscriptionName || '').toLowerCase());
+
+        Object.values(merchantGroups).forEach(group => {
+            if (group.length < 2) return;
+
+            // Sort by date descending
+            group.sort((a, b) => b.date - a.date);
+
+            const amounts = group.map(t => t.amount);
+            const maxAmount = Math.max(...amounts);
+            const minAmount = Math.min(...amounts);
+
+            if (maxAmount === 0 || (maxAmount - minAmount) / maxAmount > 0.3) return; // Must be roughly similar amount
+
+            let isRecurring = false;
+
+            // Check intervals (roughly 25-35 days for monthly)
+            if (group.length >= 3) {
+                let validIntervals = 0;
+                for (let i = 0; i < group.length - 1; i++) {
+                    const daysDiff = Math.abs(group[i].date - group[i + 1].date) / (1000 * 60 * 60 * 24);
+                    if (daysDiff >= 20 && daysDiff <= 40) validIntervals++;
+                }
+                if (validIntervals >= 2) isRecurring = true;
+            } else if (group.length === 2) {
+                const daysDiff = Math.abs(group[0].date - group[1].date) / (1000 * 60 * 60 * 24);
+                if (daysDiff >= 20 && daysDiff <= 40) isRecurring = true;
+            }
+
+            if (isRecurring) {
+                const merchantNameMatch = group[0].cleanDesc.toLowerCase();
+                const isKnown = existingSubNames.some(subName =>
+                    merchantNameMatch.includes(subName) || subName.includes(merchantNameMatch)
+                );
+
+                if (!isKnown) {
+                    newGhosts.push({
+                        id: `csvghost-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        name: group[0].originalDesc.substring(0, 25) + (group[0].originalDesc.length > 25 ? '...' : ''),
+                        amount: maxAmount,
+                        count: group.length
+                    });
+                }
+            }
+        });
+
+        if (newGhosts.length > 0) {
+            setDetectedGhosts(prev => {
+                // avoid exact duplicates by name
+                const filteredPrev = prev.filter(p => !newGhosts.some(n => n.name === p.name));
+                const combined = [...filteredPrev, ...newGhosts];
+                localStorage.setItem('detectedGhosts', JSON.stringify(combined));
+                return combined;
+            });
+        }
+
+        setIsScanning(false);
+    };
 
     // Utility Score Algorithm
     const calculateUtility = (usageDays, category, isOptimalPlan) => {
@@ -187,6 +326,35 @@ const VampireIntelligencePage = ({ onNavigate }) => {
                             {averageUtility}<span className="text-lg text-slate-500">/100</span>
                         </p>
                         <p className={`${isDarkMode ? 'text-slate-500' : 'text-indigo-400'} text-[10px] mt-2`}>Overall Spend Efficiency</p>
+                    </div>
+                </div>
+
+                {/* Scan Statement Section */}
+                <div className={`mb-8 p-6 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-6 ${cardBgClass}`}>
+                    <div className="flex gap-4 items-center">
+                        <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                            <BarChart2 size={24} />
+                        </div>
+                        <div>
+                            <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Upload Bank Statement</h3>
+                            <p className={`text-sm ${mutedTextClass}`}>Scan CSV files for hidden, recurring ghost subscriptions effortlessly.</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-3 items-center">
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileChange}
+                            className={`text-sm file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold ${isDarkMode ? 'file:bg-slate-800 file:text-slate-300 hover:file:bg-slate-700 text-slate-400' : 'file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 text-slate-500'} cursor-pointer`}
+                        />
+                        <button
+                            onClick={handleScan}
+                            disabled={!csvFile || isScanning}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-lg ${(!csvFile || isScanning) ? 'opacity-50 cursor-not-allowed' : ''} ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
+                        >
+                            {isScanning ? <Activity size={18} className="animate-spin" /> : <Zap size={18} />}
+                            {isScanning ? 'Scanning...' : 'Initiate Local Scan'}
+                        </button>
                     </div>
                 </div>
 
