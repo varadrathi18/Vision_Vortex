@@ -248,13 +248,21 @@ const StatementUpload = ({ onNavigate }) => {
 
                     {/* Actions / Scanning Status */}
                     {scanStatus === 'idle' && (
-                        <button
-                            onClick={handleScan}
-                            disabled={!file || !bankName}
-                            className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-lg transition-all ${(!file || !bankName) ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-[#20c997] hover:bg-[#1db789] text-black shadow-[0_0_20px_rgba(32,201,151,0.3)]'}`}
-                        >
-                            <Shield size={20} /> Initiate Local Scan
-                        </button>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleScan}
+                                disabled={!file || !bankName}
+                                className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-lg transition-all ${(!file || !bankName) ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-[#20c997] hover:bg-[#1db789] text-black shadow-[0_0_20px_rgba(32,201,151,0.3)]'}`}
+                            >
+                                <Shield size={20} /> Initiate Local Scan
+                            </button>
+                            <button
+                                onClick={() => onNavigate('dashboard')}
+                                className="w-full py-4 rounded-xl text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-600 font-semibold transition-all hover:bg-slate-800"
+                            >
+                                Skip for Now
+                            </button>
+                        </div>
                     )}
 
                     {scanStatus === 'scanning' && (

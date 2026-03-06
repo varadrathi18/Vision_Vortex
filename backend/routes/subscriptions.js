@@ -12,7 +12,8 @@ router.post('/', async (req, res) => {
     try {
         const {
             subscriptionName, amount, billingDate, recurrenceInterval,
-            recurrenceType, paymentAccount, currency, notifyBefore, icon, color
+            recurrenceType, paymentAccount, currency, notifyBefore, icon, color,
+            hasFreeTrial, freeTrialEndDate
         } = req.body;
 
         const newSub = new Subscription({
@@ -23,10 +24,12 @@ router.post('/', async (req, res) => {
             recurrenceInterval: parseInt(recurrenceInterval) || 1,
             recurrenceType,
             paymentAccount,
-            currency,
+            currency: currency || 'INR (₹)',
             notifyBefore,
             icon,
-            color
+            color,
+            hasFreeTrial: hasFreeTrial || false,
+            freeTrialEndDate: freeTrialEndDate || null
         });
 
         const savedSub = await newSub.save();

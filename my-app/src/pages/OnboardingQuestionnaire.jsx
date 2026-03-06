@@ -40,7 +40,7 @@ const OnboardingQuestionnaire = ({ onNavigate }) => {
                 }
             }
             // Finish onboarding and go to statement upload
-            onNavigate('statement-upload');
+            onNavigate('statementUpload');
         }
     };
 

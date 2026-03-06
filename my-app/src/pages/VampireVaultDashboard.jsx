@@ -19,18 +19,10 @@ const VampireVaultDashboard = ({ onNavigate }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     // Currency Handling
-    const preferredCurrency = localStorage.getItem('preferredCurrency') || 'USD ($)';
-    const exchangeRatesToUSD = {
-        'USD ($)': 1,
-        'EUR (€)': 1.08,
-        'INR (₹)': 0.012,
-        'GBP (£)': 1.26
-    };
-
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('en-IN', {
             style: 'currency',
-            currency: preferredCurrency.substring(0, 3)
+            currency: 'INR'
         }).format(amount);
     };
 
@@ -55,22 +47,19 @@ const VampireVaultDashboard = ({ onNavigate }) => {
         fetchSubscriptions();
     }, []);
 
-    const getMonthlyEquivalentInUSD = (sub) => {
+    const getMonthlyEquivalent = (sub) => {
         const amt = parseFloat(sub.amount);
         const val = parseInt(sub.recurrenceInterval) || 1;
-        const rateToUSD = exchangeRatesToUSD[sub.currency || 'USD ($)'] || 1;
 
         let monthlyOrig = amt;
         if (sub.recurrenceType === 'months') monthlyOrig = amt / val;
         if (sub.recurrenceType === 'weeks') monthlyOrig = (amt / val) * 4.3333;
         if (sub.recurrenceType === 'years') monthlyOrig = amt / (val * 12);
         if (sub.recurrenceType === 'days') monthlyOrig = (amt / val) * 30.416;
-        return monthlyOrig * rateToUSD;
+        return monthlyOrig;
     };
 
-    const displayRateFromUSD = 1 / (exchangeRatesToUSD[preferredCurrency] || 1);
-    const monthlySpendingUSD = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalentInUSD(sub), 0);
-    const monthlySpendingTarget = monthlySpendingUSD * displayRateFromUSD;
+    const monthlySpendingTarget = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalent(sub), 0);
     const yearlySpendingTarget = monthlySpendingTarget * 12;
 
     const today = new Date();
@@ -82,15 +71,15 @@ const VampireVaultDashboard = ({ onNavigate }) => {
     subscriptions.forEach(sub => {
         const cat = sub.icon === 'netflix' || sub.icon === 'spotify' ? 'Media Streaming' :
             sub.icon === 'briefcase' ? 'Productivity' : 'Software/Other';
-        const cost = getMonthlyEquivalentInUSD(sub);
+        const cost = getMonthlyEquivalent(sub);
         if (!categoryBreakdown[cat]) categoryBreakdown[cat] = 0;
         categoryBreakdown[cat] += cost;
     });
 
     const categories = Object.keys(categoryBreakdown).map(k => ({
         name: k,
-        amount: categoryBreakdown[k] * displayRateFromUSD,
-        percent: ((categoryBreakdown[k] / (monthlySpendingUSD || 1)) * 100).toFixed(1)
+        amount: categoryBreakdown[k],
+        percent: ((categoryBreakdown[k] / (monthlySpendingTarget || 1)) * 100).toFixed(1)
     })).sort((a, b) => b.amount - a.amount);
 
     return (
@@ -159,7 +148,7 @@ const VampireVaultDashboard = ({ onNavigate }) => {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-bold text-sm">{formatCurrency(getMonthlyEquivalentInUSD(sub) * displayRateFromUSD)}</p>
+                                        <p className="font-bold text-sm">{formatCurrency(getMonthlyEquivalent(sub))}</p>
                                         <p className={`text-[10px] ${mutedTextClass}`}>{new Date(sub.billingDate).toLocaleDateString()}</p>
                                     </div>
                                 </div>
@@ -183,7 +172,7 @@ const VampireVaultDashboard = ({ onNavigate }) => {
                                         </div>
                                         <div className="text-right flex items-center gap-3">
                                             <div>
-                                                <p className="font-bold text-sm">{formatCurrency(getMonthlyEquivalentInUSD(sub) * displayRateFromUSD)}</p>
+                                                <p className="font-bold text-sm">{formatCurrency(getMonthlyEquivalent(sub))}</p>
                                                 <p className={`text-[10px] ${mutedTextClass}`}>📅 {new Date(sub.billingDate).toLocaleDateString()}</p>
                                             </div>
                                             <span className={`${daysUntil <= 3 ? 'bg-red-500' : 'bg-orange-500'} text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1`}>

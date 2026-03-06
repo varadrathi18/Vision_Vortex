@@ -7,30 +7,16 @@ import { Icon } from '@iconify-icon/react';
 
 const API_URL = 'http://127.0.0.1:5000/api/subscriptions';
 
-// Mock Exchange Rates to USD base for multi-currency support
-const exchangeRatesToUSD = {
-    'USD ($)': 1,
-    'EUR (€)': 1.08,
-    'INR (₹)': 0.012,
-    'GBP (£)': 1.26
-};
-
 // Formatter for display
-const formatCurrency = (amount, currency) => {
-    return new Intl.NumberFormat('en-US', {
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
         style: 'currency',
-        currency: currency.substring(0, 3) // e.g., "USD"
+        currency: 'INR'
     }).format(amount);
 };
 
 const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
     const [subscriptions, setSubscriptions] = useState([]);
-    const [displayCurrency, setDisplayCurrency] = useState(localStorage.getItem('preferredCurrency') || 'USD ($)');
-
-    // Save currency preference when changed
-    useEffect(() => {
-        localStorage.setItem('preferredCurrency', displayCurrency);
-    }, [displayCurrency]);
 
     // UI State
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -50,7 +36,8 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
         recurrenceType: 'months',
         paymentAccount: '',
         notifyBefore: false,
-        currency: 'USD ($)'
+        hasFreeTrial: false,
+        freeTrialEndDate: ''
     });
 
     // Fetch subscriptions on mount
@@ -114,7 +101,7 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                 setIsModalOpen(false);
                 setFormData({
                     subscriptionName: '', amount: '', billingDate: '', icon: 'netflix', color: '#ff0000',
-                    recurrenceInterval: 1, recurrenceType: 'months', paymentAccount: '', notifyBefore: false, currency: 'USD ($)'
+                    recurrenceInterval: 1, recurrenceType: 'months', paymentAccount: '', notifyBefore: false, hasFreeTrial: false, freeTrialEndDate: ''
                 });
             } else {
                 const data = await res.json();
@@ -148,54 +135,49 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
         window.location.reload();
     };
 
-    // --- Currency Math ---
+    // --- Spend Math ---
 
-    // Converts a single subscription's interval cost to its base purely in USD Monthly cost
-    const getMonthlyEquivalentInUSD = (sub) => {
+    // Converts a single subscription's interval cost to its base purely Monthly cost
+    const getMonthlyEquivalent = (sub) => {
         const amt = parseFloat(sub.amount);
         const val = parseInt(sub.recurrenceInterval) || 1;
-        const rateToUSD = exchangeRatesToUSD[sub.currency || 'USD ($)'] || 1;
 
-        // 1. Convert to monthly equivalent in original currency
         let monthlyOrig = amt;
         if (sub.recurrenceType === 'months') monthlyOrig = amt / val;
         if (sub.recurrenceType === 'weeks') monthlyOrig = (amt / val) * 4.3333;
         if (sub.recurrenceType === 'years') monthlyOrig = amt / (val * 12);
         if (sub.recurrenceType === 'days') monthlyOrig = (amt / val) * 30.416;
 
-        // 2. Convert to USD
-        return monthlyOrig * rateToUSD;
+        return monthlyOrig;
     };
 
-    // Calculate total spend in USD, then convert to the Display Currency selected by user
-    const totalMonthlyUSD = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalentInUSD(sub), 0);
-    const displayRateFromUSD = 1 / (exchangeRatesToUSD[displayCurrency] || 1);
+    // Calculate total spend
+    const totalMonthly = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalent(sub), 0);
 
-    const totalsInDisplayCurrency = {
-        Weekly: (totalMonthlyUSD / 4.3333) * displayRateFromUSD,
-        Monthly: totalMonthlyUSD * displayRateFromUSD,
-        Yearly: (totalMonthlyUSD * 12) * displayRateFromUSD
+    const totalsInDisplay = {
+        Weekly: totalMonthly / 4.3333,
+        Monthly: totalMonthly,
+        Yearly: totalMonthly * 12
     };
 
-    // Calculate spend per account mapped to USD, then displayed in target currency
+    // Calculate spend per account
     const computeAccountBreakdown = () => {
-        const breakdownUSD = {};
+        const breakdown = {};
         subscriptions.forEach(sub => {
             const acc = sub.paymentAccount || 'Cash';
-            const valUSD = getMonthlyEquivalentInUSD(sub);
-            if (!breakdownUSD[acc]) breakdownUSD[acc] = 0;
-            breakdownUSD[acc] += valUSD;
+            const val = getMonthlyEquivalent(sub);
+            if (!breakdown[acc]) breakdown[acc] = 0;
+            breakdown[acc] += val;
         });
 
-        // Convert based on detailSummaryView and target Currency
-        const finalBreakdown = {};
-        for (let acc in breakdownUSD) {
-            let amount = breakdownUSD[acc] * displayRateFromUSD;
+        // Convert based on detailSummaryView
+        for (let acc in breakdown) {
+            let amount = breakdown[acc];
             if (detailSummaryView === 'Week') amount /= 4.3333;
             else if (detailSummaryView === 'Year') amount *= 12;
-            finalBreakdown[acc] = amount;
+            breakdown[acc] = amount;
         }
-        return finalBreakdown;
+        return breakdown;
     };
     const accountBreakdown = computeAccountBreakdown();
 
@@ -225,15 +207,6 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                     className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500 text-blue-400 rounded hover:bg-blue-600 hover:text-white transition-colors text-sm font-semibold"
                                 >
                                     <Shield size={16} /> Scan Statement
-                                </button>
-                                <button className="flex items-center gap-2 px-4 py-2 border border-[#20c997] text-[#20c997] rounded hover:bg-[#20c997]/10 transition-colors text-sm font-semibold">
-                                    <Settings size={16} /> Settings
-                                </button>
-                                <button
-                                    onClick={handleLogout}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-600/10 border border-red-500/50 text-red-500 rounded hover:bg-red-600 hover:text-white transition-colors text-sm font-semibold"
-                                >
-                                    <LogOut size={16} /> Logout
                                 </button>
                             </>
                         )}
@@ -281,7 +254,7 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                             </div>
                                             <div>
                                                 <h3 className="text-white font-bold">{sub.subscriptionName}</h3>
-                                                <p className="text-slate-400 text-xs">{formatCurrency(sub.amount, sub.currency || 'USD')} / {sub.recurrenceInterval} {sub.recurrenceType}</p>
+                                                <p className="text-slate-400 text-xs">{formatCurrency(sub.amount)} / {sub.recurrenceInterval} {sub.recurrenceType}</p>
                                             </div>
                                         </div>
 
@@ -320,15 +293,8 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                     {/* Summary Totals */}
                     {subscriptions.length > 0 && (
                         <div className="text-center mb-12">
-                            <div className="flex items-center justify-center gap-4 mb-6">
+                            <div className="flex items-center justify-center mb-6">
                                 <h2 className="text-2xl font-bold text-white">Summary</h2>
-                                <select
-                                    value={displayCurrency}
-                                    onChange={(e) => setDisplayCurrency(e.target.value)}
-                                    className="bg-[#1c1c1c] border border-slate-700 text-[#20c997] font-bold rounded-lg px-3 py-1 focus:outline-none"
-                                >
-                                    {Object.keys(exchangeRatesToUSD).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
                             </div>
 
                             <div className="flex gap-4 justify-center flex-wrap">
@@ -344,7 +310,7 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                         >
                                             <h4 className="text-lg font-bold text-white mb-2">{view}</h4>
                                             <p className={`text-3xl font-bold ${isMonthly ? 'text-[#20c997]' : 'text-red-500'}`}>
-                                                {formatCurrency(totalsInDisplayCurrency[view], displayCurrency)}
+                                                {formatCurrency(totalsInDisplay[view])}
                                             </p>
                                         </div>
                                     );
@@ -374,7 +340,7 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                             <span className="font-semibold text-sm">{acc}</span>
                                         </div>
                                         <div className="text-[#20c997] text-lg font-bold">
-                                            {formatCurrency(amt, displayCurrency)}
+                                            {formatCurrency(amt)}
                                         </div>
                                     </div>
                                 ))}
@@ -471,7 +437,7 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     <div>
                                         <label className="text-xs text-slate-300 font-bold mb-1.5 block">Payment Account</label>
                                         <input
@@ -481,20 +447,26 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                             className="w-full bg-[#111] border border-slate-700 rounded-lg p-3 text-white focus:border-[#20c997] focus:outline-none transition-colors"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-xs text-slate-300 font-bold mb-1.5 block">Currency</label>
-                                        <select
-                                            name="currency"
-                                            value={formData.currency} onChange={handleInputChange}
-                                            className="w-full bg-[#111] border border-slate-700 rounded-lg p-3 text-white focus:outline-none"
-                                        >
-                                            <option value="USD ($)">USD ($)</option>
-                                            <option value="EUR (€)">EUR (€)</option>
-                                            <option value="INR (₹)">INR (₹)</option>
-                                            <option value="GBP (£)">GBP (£)</option>
-                                        </select>
-                                    </div>
                                 </div>
+
+                                <div className="flex justify-between items-center py-2 border-t border-slate-800/50 mt-4">
+                                    <label className="text-sm font-bold text-white flex gap-2"><Settings size={18} className="text-blue-500" /> Free Trial Active?</label>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="hasFreeTrial" className="sr-only peer" checked={formData.hasFreeTrial} onChange={handleInputChange} />
+                                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                </div>
+
+                                {formData.hasFreeTrial && (
+                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2">
+                                        <label className="text-xs text-slate-300 font-bold mb-1.5 block text-blue-400">Trial End Date</label>
+                                        <input
+                                            type="date" name="freeTrialEndDate" required={formData.hasFreeTrial}
+                                            value={formData.freeTrialEndDate} onChange={handleInputChange}
+                                            className="w-full bg-blue-900/10 border border-blue-900/50 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition-colors"
+                                        />
+                                    </motion.div>
+                                )}
 
                                 <div className="flex justify-between items-center py-2 border-b border-t border-slate-800/50 my-2">
                                     <label className="text-sm font-bold text-white flex gap-2"><Bell size={18} className="text-yellow-500" /> Notify Before Due Date</label>

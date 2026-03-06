@@ -11,11 +11,10 @@ const ProfilePage = ({ onNavigate }) => {
     const [subscriptions, setSubscriptions] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const preferredCurrency = localStorage.getItem('preferredCurrency') || 'USD ($)';
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('en-IN', {
             style: 'currency',
-            currency: preferredCurrency.substring(0, 3)
+            currency: 'INR'
         }).format(amount);
     };
 

@@ -8,8 +8,10 @@ const subscriptionSchema = new mongoose.Schema({
     recurrenceInterval: { type: Number, default: 1 },
     recurrenceType: { type: String, required: true }, // e.g. "days", "months"
     paymentAccount: { type: String },
-    currency: { type: String, default: 'USD ($)' },
+    currency: { type: String, default: 'INR (₹)' },
     notifyBefore: { type: Boolean, default: false },
+    hasFreeTrial: { type: Boolean, default: false },
+    freeTrialEndDate: { type: Date },
     // Optional style fields
     icon: { type: String, default: 'calendar' },
     color: { type: String, default: '#20c997' }

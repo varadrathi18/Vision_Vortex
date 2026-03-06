@@ -39,13 +39,9 @@ export default function Reports({ onNavigate }) {
     const [subscriptions, setSubscriptions] = useState([]);
 
     // Currency Setup
-    const preferredCurrency = localStorage.getItem('preferredCurrency') || 'USD ($)';
-    const exchangeRatesToUSD = {
-        'USD ($)': 1, 'EUR (€)': 1.08, 'INR (₹)': 0.012, 'GBP (£)': 1.26
-    };
-    const formatCurrency = (value) => new Intl.NumberFormat("en-US", {
+    const formatCurrency = (value) => new Intl.NumberFormat("en-IN", {
         style: "currency",
-        currency: preferredCurrency.substring(0, 3),
+        currency: "INR",
         minimumFractionDigits: 0,
     }).format(value);
 
@@ -67,19 +63,16 @@ export default function Reports({ onNavigate }) {
     }, []);
 
     // --- Dynamic Calculations ---
-    const getMonthlyEquivalentInUSD = (sub) => {
+    const getMonthlyEquivalent = (sub) => {
         const amt = parseFloat(sub.amount);
         const val = parseInt(sub.recurrenceInterval) || 1;
-        const rateToUSD = exchangeRatesToUSD[sub.currency || 'USD ($)'] || 1;
         let monthlyOrig = amt;
         if (sub.recurrenceType === 'months') monthlyOrig = amt / val;
         if (sub.recurrenceType === 'weeks') monthlyOrig = (amt / val) * 4.3333;
         if (sub.recurrenceType === 'years') monthlyOrig = amt / (val * 12);
         if (sub.recurrenceType === 'days') monthlyOrig = (amt / val) * 30.416;
-        return monthlyOrig * rateToUSD;
+        return monthlyOrig;
     };
-
-    const displayRateFromUSD = 1 / (exchangeRatesToUSD[preferredCurrency] || 1);
 
     // Categories
     const categoryBreakdown = {};
@@ -89,7 +82,7 @@ export default function Reports({ onNavigate }) {
         else if (sub.icon === 'briefcase' || sub.icon === 'code') cat = 'Productivity';
         else if (sub.icon === 'database' || sub.icon === 'cloud') cat = 'Software/VPS';
 
-        const monthlyTargetCost = getMonthlyEquivalentInUSD(sub) * displayRateFromUSD;
+        const monthlyTargetCost = getMonthlyEquivalent(sub);
         if (!categoryBreakdown[cat]) categoryBreakdown[cat] = 0;
         categoryBreakdown[cat] += monthlyTargetCost;
     });
@@ -99,9 +92,8 @@ export default function Reports({ onNavigate }) {
         value: categoryBreakdown[k],
     })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
 
-    // Projected Trend Data (Next 6 Months based on monthly equivalent)
     const trendData = [];
-    let currentMonthlyCost = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalentInUSD(sub), 0) * displayRateFromUSD;
+    let currentMonthlyCost = subscriptions.reduce((sum, sub) => sum + getMonthlyEquivalent(sub), 0);
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const d = new Date();
