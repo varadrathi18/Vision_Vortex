@@ -93,6 +93,47 @@ const VampireIntelligencePage = ({ onNavigate }) => {
     const mutedTextClass = isDarkMode ? "text-slate-400" : "text-slate-500";
     const headerBorderClass = isDarkMode ? "border-slate-800" : "border-slate-200";
 
+    // --- Dynamic Savings Generation ---
+    const generateSavingsAlerts = () => {
+        let alerts = [];
+        subscriptions.forEach(sub => {
+            const name = sub.subscriptionName.toLowerCase();
+            const amt = sub.amount;
+
+            // Media Plans
+            if (name.includes('spotify') && amt > 119) {
+                alerts.push({ title: 'Family Plan Available', desc: `Switch ${sub.subscriptionName} to the Family Plan. Share with 2 users and save ₹120/mo.` });
+            } else if (name.includes('netflix') && amt > 199) {
+                alerts.push({ title: 'Downgrade Resolution', desc: `Switch ${sub.subscriptionName} to Basic (720p). Save ₹${amt - 199}/mo if 4K isn't needed.` });
+            } else if (name.includes('amazon') && sub.recurrenceType === 'months') {
+                alerts.push({ title: 'Annual Billing', desc: `Switch ${sub.subscriptionName} to Yearly billing. Save approx 20% over 12 months.` });
+            }
+
+            // Software / Tools
+            if (name.includes('adobe') && amt > 1500) {
+                alerts.push({ title: 'Student Discount', desc: `Verify a .edu email for ${sub.subscriptionName} to get a 60% student discount.` });
+            }
+
+            // Free Trials (Warning)
+            if (sub.hasFreeTrial) {
+                const daysLeft = sub.freeTrialEndDate ? Math.max(0, Math.ceil((new Date(sub.freeTrialEndDate) - new Date()) / (1000 * 60 * 60 * 24))) : 0;
+                alerts.push({ title: 'Trial Expiring', desc: `${sub.subscriptionName} trial ends in ${daysLeft} days. Cancel now to avoid being charged ₹${amt}.` });
+            }
+        });
+
+        // Add a generic one if nothing specifically matched
+        if (alerts.length === 0 && subscriptions.length > 0) {
+            alerts.push({ title: 'Consolidate Services', desc: `You have ${subscriptions.length} active subscriptions. Pausing the least used one saves money.` });
+        } else if (subscriptions.length === 0) {
+            alerts.push({ title: 'Clean Slate', desc: "You have no subscriptions. Keep it that way to maximize savings!" });
+        }
+
+        return alerts;
+    };
+
+    const savingsAlerts = generateSavingsAlerts();
+    const activeAlert = savingsAlerts[0]; // Show the most relevant one
+
     // Data
     const data = [3200, 4100, 3800, 4500, 4200, 4850];
     const chartData = {
@@ -249,17 +290,19 @@ const VampireIntelligencePage = ({ onNavigate }) => {
                     </div>
                 </div>
 
-                {/* Savings Engine Footer */}
-                <div className={`mt-8 p-6 rounded-2xl border flex items-center justify-between ${isDarkMode ? 'bg-gradient-to-r from-indigo-900/20 to-transparent border-indigo-500/20' : 'bg-indigo-50/50 border-indigo-100 shadow-sm'}`}>
-                    <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full text-indigo-500 ${isDarkMode ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}><TrendingDown size={24} /></div>
-                        <div>
-                            <p className={`text-sm font-bold underline underline-offset-4 mb-0.5 uppercase tracking-wide ${isDarkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>Savings Alert</p>
-                            <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Switch Spotify to the <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Family Plan</span>. You share a household with 2 other users. Save ₹120/mo.</p>
+                {/* Dynamic Savings Engine Footer */}
+                {activeAlert && (
+                    <div className={`mt-8 p-6 rounded-2xl border flex items-center justify-between ${isDarkMode ? 'bg-gradient-to-r from-indigo-900/20 to-transparent border-indigo-500/20' : 'bg-indigo-50/50 border-indigo-100 shadow-sm'}`}>
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-full text-indigo-500 ${isDarkMode ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}><TrendingDown size={24} /></div>
+                            <div>
+                                <p className={`text-sm font-bold underline underline-offset-4 mb-0.5 uppercase tracking-wide ${isDarkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>{activeAlert.title}</p>
+                                <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{activeAlert.desc}</p>
+                            </div>
                         </div>
+                        <button className={`px-6 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg uppercase tracking-wide ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}>Apply Optimization</button>
                     </div>
-                    <button className={`px-6 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg uppercase tracking-wide ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}>Apply Optimization</button>
-                </div>
+                )}
 
             </main>
         </div>

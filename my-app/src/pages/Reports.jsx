@@ -64,6 +64,12 @@ export default function Reports({ onNavigate }) {
 
     // --- Dynamic Calculations ---
     const getMonthlyEquivalent = (sub) => {
+        // Exclude active free trials from spending math
+        if (sub.hasFreeTrial && sub.freeTrialEndDate) {
+            const trialEnd = new Date(sub.freeTrialEndDate);
+            if (trialEnd >= new Date()) return 0; // Currently free
+        }
+
         const amt = parseFloat(sub.amount);
         const val = parseInt(sub.recurrenceInterval) || 1;
         let monthlyOrig = amt;

@@ -48,6 +48,11 @@ const VampireVaultDashboard = ({ onNavigate }) => {
     }, []);
 
     const getMonthlyEquivalent = (sub) => {
+        if (sub.hasFreeTrial && sub.freeTrialEndDate) {
+            const trialEnd = new Date(sub.freeTrialEndDate);
+            if (trialEnd >= new Date()) return 0; // Currently free
+        }
+
         const amt = parseFloat(sub.amount);
         const val = parseInt(sub.recurrenceInterval) || 1;
 
@@ -143,7 +148,14 @@ const VampireVaultDashboard = ({ onNavigate }) => {
                                             <i className={`mdi mdi-${sub.icon || 'calendar'} ${isDarkMode ? '' : 'text-slate-900'}`}></i>
                                         </div>
                                         <div>
-                                            <p className={`font-bold text-sm group-hover:${isDarkMode ? 'text-white' : 'text-slate-900'} transition-colors`}>{sub.subscriptionName}</p>
+                                            <p className={`font-bold text-sm group-hover:${isDarkMode ? 'text-white' : 'text-slate-900'} transition-colors flex items-center gap-2`}>
+                                                {sub.subscriptionName}
+                                                {sub.hasFreeTrial && new Date(sub.freeTrialEndDate) >= new Date() && (
+                                                    <span className="text-[9px] bg-blue-500/20 text-blue-500 border border-blue-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest">
+                                                        Trial Active
+                                                    </span>
+                                                )}
+                                            </p>
                                             <p className={`text-xs ${mutedTextClass}`}>{sub.recurrenceInterval} {sub.recurrenceType}</p>
                                         </div>
                                     </div>
