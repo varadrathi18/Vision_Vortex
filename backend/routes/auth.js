@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { User } from '../models/User.js';
+import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -207,8 +208,6 @@ router.post('/login', async (req, res) => {
     }
 });
 
-import { verifyToken } from '../middleware/auth.js';
-
 // Route 4: Get Profile
 router.get('/profile', verifyToken, async (req, res) => {
     try {
@@ -240,5 +239,4 @@ router.put('/profile', verifyToken, async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
 export default router;

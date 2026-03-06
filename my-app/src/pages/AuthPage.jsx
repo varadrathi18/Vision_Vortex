@@ -295,6 +295,7 @@ const AuthPage = ({ initialMode = 'login', onLoginSuccess, onSignupSuccess }) =>
                 {/* OTP FORM */}
                 {mode === 'otp' && (
                     <form onSubmit={handleOtpSubmit} className="space-y-6">
+
                         <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 text-center">
                             <p className="text-sm text-slate-300 mb-2">We've sent a verification OTP to <span className="text-white font-bold">{formData.email}</span>.</p>
                         </div>
