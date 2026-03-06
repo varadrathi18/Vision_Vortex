@@ -129,6 +129,56 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
         }
     };
 
+    const handleToggleNotify = async (sub) => {
+        const isCurrentlyOn = sub.notifyBefore;
+
+        // Confirmation dialog based on user prompt logic
+        if (!isCurrentlyOn) {
+            const confirmOn = window.confirm(`Do you want to enable automatic reminders for ${sub.subscriptionName}?\n\nYou will receive a message on your registered WhatsApp number and email 5, 3, and 1 days before the plan expires.`);
+            if (!confirmOn) return;
+        } else {
+            const confirmOff = window.confirm(`Are you sure you want to disable automatic reminders for ${sub.subscriptionName}?`);
+            if (!confirmOff) return;
+        }
+
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/${sub._id}/toggle-notify`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notifyBefore: !isCurrentlyOn })
+            });
+
+            if (res.ok) {
+                const updatedSub = await res.json();
+                setSubscriptions(subscriptions.map(s => s._id === sub._id ? updatedSub : s));
+            }
+        } catch (error) {
+            console.error("Toggle Notify error:", error);
+        }
+    };
+
+    const handleSendTestNotification = async (subId) => {
+        const token = localStorage.getItem('token');
+        try {
+            alert("Sending test notification to your email and WhatsApp...");
+            const res = await fetch(`${API_URL}/${subId}/test-notification`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert("Test notification sent successfully!");
+            } else {
+                alert("Failed to send test notification.");
+            }
+        } catch (error) {
+            console.error("Error sending test:", error);
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -275,11 +325,28 @@ const SubscriptionManager = ({ onNavigate, isNewSignup }) => {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 justify-end w-1/4">
-                                            <button className="text-xs font-bold text-slate-400 hover:text-white px-3 py-1.5 transition-colors">Edit</button>
+                                        <div className="flex items-center gap-2 justify-end w-2/5">
+                                            {sub.notifyBefore ? (
+                                                <button onClick={() => handleToggleNotify(sub)} className="text-xs font-bold text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500 hover:text-black border border-yellow-500/20 px-2 py-1.5 rounded transition-all whitespace-nowrap">
+                                                    Turn Off Reminders
+                                                </button>
+                                            ) : (
+                                                <button onClick={() => handleToggleNotify(sub)} className="text-xs font-bold text-[#20c997] bg-[#20c997]/10 hover:bg-[#20c997] hover:text-black border border-[#20c997]/20 px-2 py-1.5 rounded transition-all whitespace-nowrap flex items-center gap-1">
+                                                    <Bell size={12} /> Enable Reminders
+                                                </button>
+                                            )}
+
+                                            <button
+                                                onClick={() => handleSendTestNotification(sub._id)}
+                                                className="text-xs font-bold text-blue-400 bg-blue-400/10 hover:bg-blue-500 hover:text-white border border-blue-500/20 px-2 py-1.5 rounded transition-all whitespace-nowrap"
+                                                title="Send a sample notification via WhatsApp and Email"
+                                            >
+                                                Test Ping
+                                            </button>
+
                                             <button
                                                 onClick={() => handleDelete(sub._id)}
-                                                className="text-xs font-bold text-red-400 bg-red-400/10 hover:bg-red-500 hover:text-white border border-red-500/20 px-3 py-1.5 rounded transition-all"
+                                                className="text-xs font-bold text-red-400 bg-red-400/10 hover:bg-red-500 hover:text-white border border-red-500/20 px-2 py-1.5 rounded transition-all"
                                             >
                                                 Delete
                                             </button>

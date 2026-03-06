@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import { startNotificationJob } from './cron/notificationJob.js';
 
 dotenv.config();
 
@@ -21,6 +22,9 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.get('/', (req, res) => {
   res.send('Vampire Vault API is running');
 });
+
+// Start Cron Jobs
+startNotificationJob();
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI)
